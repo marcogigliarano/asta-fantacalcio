@@ -474,6 +474,28 @@ p {
   box-shadow: var(--shadow-soft);
 }
 
+.brand,
+.section-title,
+.team-card__title,
+.team-detail__title,
+.panel-card h2,
+.panel-card h3,
+.board-header h2,
+.form-card__title {
+  font-weight: 700;
+}
+
+.primary-button,
+.secondary-button,
+.nav-button,
+.ghost-button,
+.role-pill,
+.stat-chip__value,
+.team-card__president,
+.role-panel__title {
+  font-weight: 600;
+}
+
 .main-column {
   padding: 18px;
 }

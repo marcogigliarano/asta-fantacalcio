@@ -39,7 +39,10 @@ export const apiRequest = async (path, options = {}) => {
     throw new Error(message || `API request failed (${response.status})`);
   }
 
-  return response.json();
+  if (response.status === 204) return null;
+
+  const body = await response.text();
+  return body ? JSON.parse(body) : null;
 };
 
 export const sql = (strings, ...values) => {

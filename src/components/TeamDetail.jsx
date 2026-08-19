@@ -4,7 +4,7 @@ import { sql } from '../lib/db';
 const ROLE_TARGETS = { P: 3, D: 8, C: 8, A: 6 };
 const ROLE_NAMES = { P: 'Portieri', D: 'Difensori', C: 'Centrocampisti', A: 'Attaccanti' };
 
-export default function TeamDetail({ team, players, onBack, onUpdate }) {
+export default function TeamDetail({ team, players, onBack, onUpdate, canEdit }) {
   const teamPlayers = players.filter((p) => p.assigned_team_id === team.id);
   const spentCredits = teamPlayers.reduce((acc, p) => acc + (Number(p.price_spent) || 0), 0);
   const remainingCredits = team.budget - spentCredits;
@@ -120,22 +120,22 @@ export default function TeamDetail({ team, players, onBack, onUpdate }) {
                         <span className="role-list__team">{p.real_team}</span>
                       </div>
                       <div className="role-list__meta">
-                        <button
+                        {canEdit && <button
                           type="button"
                           className="role-list__price-button"
                           onClick={() => handleUpdatePlayerPrice(p)}
                           title="Modifica costo speso"
                         >
                           {p.price_spent} cr
-                        </button>
-                        <button
+                        </button>}
+                        {canEdit && <button
                           type="button"
                           className="role-list__release"
                           onClick={() => handleReleasePlayer(p)}
                           title="Svincola calciatore"
                         >
                           ✕
-                        </button>
+                        </button>}
                       </div>
                     </li>
                   ))}

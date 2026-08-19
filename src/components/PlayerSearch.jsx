@@ -3,7 +3,7 @@ import { sql } from '../lib/db';
 
 const getListValue = (player) => Number(player?.list_value ?? player?.price_spent ?? 0) || 0;
 
-export default function PlayerSearch({ players, currentRole, swapMode, onSelectPlayer, onExecuteSwap, onPlayerAdded }) {
+export default function PlayerSearch({ players, currentRole, swapMode, onSelectPlayer, onExecuteSwap, onPlayerAdded, canEdit }) {
   const [search, setSearch] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [sortMode, setSortMode] = useState('value');
@@ -96,14 +96,14 @@ export default function PlayerSearch({ players, currentRole, swapMode, onSelectP
     <div className="form-card player-search">
       <div className="search-toolbar">
         <h3>Cerca Giocatore ({currentRole})</h3>
-        <button
+        {canEdit && <button
           type="button"
           className={`primary-button ${showAddForm ? 'secondary-button' : ''}`}
           onClick={() => setShowAddForm(!showAddForm)}
           style={{ minWidth: '180px' }}
         >
           {showAddForm ? 'Chiudi' : '➕ Aggiungi calciatore'}
-        </button>
+        </button>}
       </div>
 
       {showAddForm && (
@@ -251,7 +251,7 @@ export default function PlayerSearch({ players, currentRole, swapMode, onSelectP
                 >
                   {getListValue(p)}
                 </span>
-                {swapMode ? (
+                {canEdit && (swapMode ? (
                   <button type="button" className="swap-button" onClick={() => onExecuteSwap(p)}>
                     Sostituisci
                   </button>
@@ -259,13 +259,15 @@ export default function PlayerSearch({ players, currentRole, swapMode, onSelectP
                   <button type="button" className="select-button" onClick={() => onSelectPlayer(p)}>
                     Seleziona
                   </button>
-                )}
-                <button type="button" onClick={() => handleStartEdit(p)} title="Modifica">
-                  ✏️
-                </button>
-                <button type="button" className="danger-button" onClick={() => handleDeletePlayer(p)} title="Elimina">
-                  🗑️
-                </button>
+                ))}
+                {canEdit && <>
+                  <button type="button" onClick={() => handleStartEdit(p)} title="Modifica">
+                    ✏️
+                  </button>
+                  <button type="button" className="danger-button" onClick={() => handleDeletePlayer(p)} title="Elimina">
+                    🗑️
+                  </button>
+                </>}
               </div>
             </div>
           ))

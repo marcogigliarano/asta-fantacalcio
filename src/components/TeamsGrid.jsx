@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 
 const ROLE_TARGETS = { P: 3, D: 8, C: 8, A: 6 };
 
-export default function TeamsGrid({ teams, players, onSelectTeam, onAddTeam, onEditTeam, onDeleteTeam }) {
+export default function TeamsGrid({ teams, players, onSelectTeam, onAddTeam, onEditTeam, onDeleteTeam, canEdit }) {
   const [displayMode, setDisplayMode] = useState('scroll');
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -35,9 +35,11 @@ export default function TeamsGrid({ teams, players, onSelectTeam, onAddTeam, onE
             {isCollapsed ? 'Expand' : 'Collapse'}
           </button>
 
-          <button type="button" className="primary-button" onClick={onAddTeam}>
-            + Aggiungi Squadra
-          </button>
+          {canEdit && (
+            <button type="button" className="primary-button" onClick={onAddTeam}>
+              + Aggiungi Squadra
+            </button>
+          )}
         </div>
       </div>
 
@@ -76,7 +78,7 @@ export default function TeamsGrid({ teams, players, onSelectTeam, onAddTeam, onE
               >
                 <div className="team-card__header">
                   <div className="team-card__title" title={team.name}>{team.name}</div>
-                  <div className="team-card__actions">
+                  {canEdit && <div className="team-card__actions">
                     <button
                       type="button"
                       className="icon-button"
@@ -99,7 +101,7 @@ export default function TeamsGrid({ teams, players, onSelectTeam, onAddTeam, onE
                     >
                       🗑️
                     </button>
-                  </div>
+                  </div>}
                 </div>
 
                 {presidents && (

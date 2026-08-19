@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   SignIn,
-  UserButton,
   useAuth,
+  useClerk,
   useUser,
 } from '@clerk/clerk-react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -51,12 +51,36 @@ const fetchUsersFromDb = async () => {
 
 const getListValue = (player) => Number(player?.list_value ?? player?.price_spent ?? 0) || 0;
 
+function AccountControl() {
+  const { signOut } = useClerk();
+  const { user } = useUser();
+  const email = user?.primaryEmailAddress?.emailAddress || '';
+
+  return (
+    <button
+      type="button"
+      className="secondary-button"
+      title={`Esci da ${email}`}
+      onClick={() => {
+        if (window.confirm('Vuoi davvero uscire?')) {
+          signOut();
+        }
+      }}
+    >
+      Esci
+    </button>
+  );
+}
+
 function UserAccessManager({ teams }) {
   const { user } = useUser();
   const currentUserEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase() || '';
   const [users, setUsers] = useState([]);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingEmail, setEditingEmail] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  const [editTeamId, setEditTeamId] = useState('');
 
   const refreshUsers = async () => {
     const nextUsers = await fetchUsersFromDb();
@@ -81,7 +105,8 @@ function UserAccessManager({ teams }) {
 
   const addUser = async (e) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const formData = new FormData(form);
     const email = String(formData.get('email') || '').trim().toLowerCase();
     const password = String(formData.get('password') || '');
     const teamId = String(formData.get('team_id') || '');
@@ -94,7 +119,7 @@ function UserAccessManager({ teams }) {
         method: 'POST',
         body: JSON.stringify({ email, password, teamId: teamId ? Number(teamId) : null }),
       });
-      e.currentTarget.reset();
+      form.reset();
       await refreshUsers();
     } catch (err) {
       console.error('Failed to add user:', err);
@@ -134,6 +159,44 @@ function UserAccessManager({ teams }) {
     }
   };
 
+  const startEditing = (entry) => {
+    setEditingEmail(entry.email);
+    setEditPassword('');
+    setEditTeamId(entry.teamId ? String(entry.teamId) : '');
+    setError('');
+  };
+
+  const saveUser = async (email) => {
+    try {
+      setError('');
+      await apiRequest('/api/users', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          email,
+          password: editPassword || undefined,
+          teamId: editTeamId ? Number(editTeamId) : null,
+        }),
+      });
+      setEditingEmail('');
+      await refreshUsers();
+    } catch (err) {
+      console.error('Failed to update user:', err);
+      setError(err.message || 'Impossibile modificare l’utente.');
+    }
+  };
+
+  const removeUser = async (email) => {
+    if (email === currentUserEmail || !window.confirm(`Rimuovere ${email}?`)) return;
+    try {
+      setError('');
+      await apiRequest(`/api/users?email=${encodeURIComponent(email)}`, { method: 'DELETE' });
+      await refreshUsers();
+    } catch (err) {
+      console.error('Failed to remove user:', err);
+      setError(err.message || 'Impossibile rimuovere l’utente.');
+    }
+  };
+
   if (!user) {
     return null;
   }
@@ -154,7 +217,7 @@ function UserAccessManager({ teams }) {
           <div className="eyebrow">Amministrazione</div>
           <h2 style={{ margin: 0 }}>Utenti e accessi</h2>
         </div>
-        <UserButton />
+        <AccountControl />
       </div>
 
       <form onSubmit={addUser} style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
@@ -187,7 +250,7 @@ function UserAccessManager({ teams }) {
           <p>Nessun utente configurato.</p>
         ) : (
           users.map((entry) => (
-            <div key={entry.email} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '12px 14px', border: '1px solid #dfe3ea', borderRadius: '12px', background: '#f8fafc' }}>
+            <div key={entry.email} style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '12px 14px', border: '1px solid #dfe3ea', borderRadius: '12px', background: '#f8fafc' }}>
               <div>
                 <div style={{ fontWeight: 700 }}>{entry.email}</div>
                 <div style={{ color: '#64748b', fontSize: '12px' }}>
@@ -197,13 +260,41 @@ function UserAccessManager({ teams }) {
               </div>
 
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <button type="button" className="secondary-button" onClick={() => toggleAdmin(entry.email)}>
-                  {entry.role === 'admin' ? 'Rimuovi admin' : 'Rendi admin'}
-                </button>
-                <button type="button" className="secondary-button" onClick={() => toggleActive(entry.email)}>
-                  {entry.isActive === false ? 'Abilita' : 'Disabilita'}
-                </button>
+                {editingEmail !== entry.email && (
+                  <>
+                    <button type="button" className="secondary-button" onClick={() => startEditing(entry)}>
+                      Modifica
+                    </button>
+                    <button type="button" className="secondary-button" onClick={() => toggleAdmin(entry.email)}>
+                      {entry.role === 'admin' ? 'Rimuovi admin' : 'Rendi admin'}
+                    </button>
+                    <button type="button" className="secondary-button" onClick={() => toggleActive(entry.email)}>
+                      {entry.isActive === false ? 'Abilita' : 'Disabilita'}
+                    </button>
+                    <button type="button" className="secondary-button" onClick={() => removeUser(entry.email)}>
+                      Rimuovi
+                    </button>
+                  </>
+                )}
               </div>
+              {editingEmail === entry.email && (
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', width: '100%', marginTop: '10px' }}>
+                  <input
+                    type="password"
+                    value={editPassword}
+                    onChange={(event) => setEditPassword(event.target.value)}
+                    placeholder="Nuova password (opzionale, min. 8)"
+                    minLength={8}
+                    style={{ flex: '1', minWidth: '220px', padding: '8px 10px', borderRadius: '8px', border: '1px solid #d1d5db' }}
+                  />
+                  <select value={editTeamId} onChange={(event) => setEditTeamId(event.target.value)} style={{ minWidth: '180px', padding: '8px 10px', borderRadius: '8px', border: '1px solid #d1d5db' }}>
+                    <option value="">Nessuna squadra</option>
+                    {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
+                  </select>
+                  <button type="button" className="primary-button" onClick={() => saveUser(entry.email)}>Salva</button>
+                  <button type="button" className="secondary-button" onClick={() => setEditingEmail('')}>Annulla</button>
+                </div>
+              )}
             </div>
           ))
         )}
@@ -422,7 +513,7 @@ export default function App() {
           <p style={{ color: '#475569' }}>
             Il tuo account non è stato abilitato. Contatta l’amministratore.
           </p>
-          <UserButton />
+          <AccountControl />
         </div>
       </div>
     );
@@ -449,13 +540,13 @@ export default function App() {
           >
             Dashboard
           </button>
-          <button
+          {isAdmin && <button
             type="button"
             className={`nav-button ${activeTab === 'settings' && !selectedTeam ? 'nav-button--active' : ''}`}
             onClick={goToSettings}
           >
             Impostazioni
-          </button>
+          </button>}
           {isAdmin && (
             <button
               type="button"
@@ -465,7 +556,7 @@ export default function App() {
               Utenti
             </button>
           )}
-          <UserButton />
+          <AccountControl />
         </div>
       </header>
 
@@ -479,10 +570,11 @@ export default function App() {
               players={players}
               onBack={closeTeamDetail}
               onUpdate={fetchData}
+              canEdit={isAdmin}
             />
           </div>
         </div>
-      ) : activeTab === 'settings' ? (
+      ) : activeTab === 'settings' && isAdmin ? (
         <div style={{ marginTop: '20px' }}>
           <Settings playersCount={players.length} onUpdate={fetchData} />
         </div>
@@ -491,6 +583,7 @@ export default function App() {
           <TeamsGrid
             teams={teams}
             players={players}
+            canEdit={isAdmin}
             onSelectTeam={openTeam}
             onAddTeam={() => {
               setTeamToEdit(null);
@@ -528,6 +621,7 @@ export default function App() {
               <PlayerSearch
                 players={players}
                 currentRole={currentRole}
+                canEdit={isAdmin}
                 swapMode={swapMode}
                 onSelectPlayer={(player) => setSelectedPlayer(player)}
                 onExecuteSwap={handleExecuteSwap}

@@ -79,6 +79,95 @@ app.post('/api/sql', authenticate, async (req, res) => {
   }
 });
 
+app.get('/api/users', authenticate, async (req, res) => {
+  const adminEmails = String(
+    process.env.ADMIN_EMAILS
+      || process.env.VITE_ADMIN_EMAILS
+      || process.env.VITE_ADMIN_EMAIL
+      || ''
+  )
+    .split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
+  if (!adminEmails.includes(req.email)) return res.status(403).send('Admin access required');
+
+  try {
+    const clerkUsers = await clerk.users.getUserList({ limit: 100 });
+    let accessRows;
+    try {
+      accessRows = await sql`SELECT email, role, is_active, team_id FROM app_users ORDER BY email ASC`;
+    } catch (error) {
+      console.warn('app_users.team_id is unavailable; loading users without team assignments:', error.message);
+      accessRows = await sql`SELECT email, role, is_active FROM app_users ORDER BY email ASC`;
+    }
+    const accessByEmail = new Map(accessRows.map((row) => [row.email.trim().toLowerCase(), row]));
+    const users = clerkUsers.data.map((clerkUser) => {
+      const email = clerkUser.emailAddresses
+        .find((address) => address.id === clerkUser.primaryEmailAddressId)
+        ?.emailAddress?.trim().toLowerCase();
+      if (!email) return null;
+      const access = accessByEmail.get(email);
+      return {
+        email,
+        role: access?.role === 'admin' ? 'admin' : 'user',
+        isActive: access?.is_active !== false && access?.is_active !== 0,
+        teamId: access?.team_id ?? null,
+      };
+    }).filter(Boolean).sort((left, right) => left.email.localeCompare(right.email));
+    return res.json(users);
+  } catch (error) {
+    console.error('User list failed:', error);
+    return res.status(error.statusCode || error.status || 500).send(
+      error.errors?.[0]?.longMessage || error.errors?.[0]?.message || error.message || 'Unable to load users'
+    );
+  }
+});
+
+const findClerkUserByEmail = async (email) => {
+  const clerkUsers = await clerk.users.getUserList({ limit: 100 });
+  return clerkUsers.data.find((clerkUser) => clerkUser.emailAddresses
+    .some((address) => address.emailAddress.trim().toLowerCase() === email));
+};
+
+app.delete('/api/users', authenticate, async (req, res) => {
+  const email = String(req.query.email || '').trim().toLowerCase();
+  const adminEmails = String(process.env.ADMIN_EMAILS || process.env.VITE_ADMIN_EMAILS || process.env.VITE_ADMIN_EMAIL || '')
+    .split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
+  if (!adminEmails.includes(req.email)) return res.status(403).send('Admin access required');
+  try {
+    const target = await findClerkUserByEmail(email);
+    if (!target) return res.status(404).send('Clerk user not found');
+    await clerk.users.deleteUser(target.id);
+    await sql`DELETE FROM app_users WHERE email = ${email}`;
+    return res.status(204).end();
+  } catch (error) {
+    return res.status(error.statusCode || error.status || 500).send(error.message || 'Unable to remove user');
+  }
+});
+
+app.patch('/api/users', authenticate, async (req, res) => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  const { password, teamId = null } = req.body || {};
+  const adminEmails = String(process.env.ADMIN_EMAILS || process.env.VITE_ADMIN_EMAILS || process.env.VITE_ADMIN_EMAIL || '')
+    .split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
+  if (!adminEmails.includes(req.email)) return res.status(403).send('Admin access required');
+  if (password !== undefined && (typeof password !== 'string' || password.length < 8)) {
+    return res.status(400).send('Password must contain at least 8 characters');
+  }
+  try {
+    const target = await findClerkUserByEmail(email);
+    if (!target) return res.status(404).send('Clerk user not found');
+    if (password) await clerk.users.updateUser(target.id, { password });
+    await sql(
+      `INSERT INTO app_users (email, role, is_active, team_id)
+       VALUES ($1, 'user', TRUE, $2)
+       ON CONFLICT (email) DO UPDATE SET team_id = EXCLUDED.team_id`,
+      [email, teamId]
+    );
+    return res.json({ email, teamId });
+  } catch (error) {
+    return res.status(error.statusCode || error.status || 500).send(error.message || 'Unable to update user');
+  }
+});
+
 app.post('/api/users', authenticate, async (req, res) => {
   const adminEmails = String(
     process.env.ADMIN_EMAILS
