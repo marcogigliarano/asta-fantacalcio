@@ -7,7 +7,7 @@ process.loadEnvFile?.('.env.local');
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
-const databaseUrl = process.env.NEON_DATABASE_URL || process.env.VITE_NEON_DATABASE_URL;
+const databaseUrl = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL || process.env.VITE_NEON_DATABASE_URL;
 const clerkSecretKey = process.env.CLERK_SECRET_KEY;
 
 if (!databaseUrl || !clerkSecretKey) {
