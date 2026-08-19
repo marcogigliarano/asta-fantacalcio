@@ -80,8 +80,8 @@ app.post('/api/users', authenticate, async (req, res) => {
   if (!adminEmails.includes(req.email)) return res.status(403).send('Admin access required');
 
   const { email, password, teamId = null } = req.body || {};
-  if (typeof email !== 'string' || typeof password !== 'string' || password.length < 15) {
-    return res.status(400).send('Email and a password of at least 15 characters are required');
+  if (typeof email !== 'string' || typeof password !== 'string' || password.length < 8) {
+    return res.status(400).send('Email and a password of at least 8 characters are required');
   }
 
   try {

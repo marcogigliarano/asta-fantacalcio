@@ -167,8 +167,8 @@ function UserAccessManager({ teams }) {
         <input
           type="password"
           name="password"
-          placeholder="Password (min. 15 caratteri)"
-          minLength={15}
+          placeholder="Password (min. 8 caratteri)"
+          minLength={8}
           required
           style={{ flex: '1', minWidth: '220px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #d1d5db' }}
         />

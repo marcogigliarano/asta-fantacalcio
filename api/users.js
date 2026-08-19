@@ -36,8 +36,8 @@ export default async function handler(req, res) {
 
     const { email, password, teamId = null } = req.body || {};
     const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
-    if (!normalizedEmail || typeof password !== 'string' || password.length < 15) {
-      return res.status(400).send('Email and a password of at least 15 characters are required');
+    if (!normalizedEmail || typeof password !== 'string' || password.length < 8) {
+      return res.status(400).send('Email and a password of at least 8 characters are required');
     }
 
     await clerk.users.createUser({ emailAddress: [normalizedEmail], password });
