@@ -51,7 +51,12 @@ app.post('/api/sql', authenticate, async (req, res) => {
   }
 
   if (!isReadOnly(query)) {
-    const adminEmails = String(process.env.ADMIN_EMAILS || '')
+    const adminEmails = String(
+      process.env.ADMIN_EMAILS
+        || process.env.VITE_ADMIN_EMAILS
+        || process.env.VITE_ADMIN_EMAIL
+        || ''
+    )
       .split(',')
       .map((value) => value.trim().toLowerCase())
       .filter(Boolean);
@@ -75,7 +80,12 @@ app.post('/api/sql', authenticate, async (req, res) => {
 });
 
 app.post('/api/users', authenticate, async (req, res) => {
-  const adminEmails = String(process.env.ADMIN_EMAILS || '')
+  const adminEmails = String(
+    process.env.ADMIN_EMAILS
+      || process.env.VITE_ADMIN_EMAILS
+      || process.env.VITE_ADMIN_EMAIL
+      || ''
+  )
     .split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
   if (!adminEmails.includes(req.email)) return res.status(403).send('Admin access required');
 
@@ -95,7 +105,9 @@ app.post('/api/users', authenticate, async (req, res) => {
     return res.status(201).json({ email: email.trim().toLowerCase(), teamId });
   } catch (error) {
     console.error('User creation failed:', error);
-    return res.status(400).send(error.errors?.[0]?.longMessage || 'Unable to create user');
+    return res.status(error.statusCode || error.status || 400).send(
+      error.errors?.[0]?.longMessage || error.errors?.[0]?.message || error.message || 'Unable to create user'
+    );
   }
 });
 

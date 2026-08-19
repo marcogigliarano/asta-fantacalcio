@@ -31,7 +31,12 @@ export const authenticate = async (req) => {
   };
 };
 
-export const isAdmin = (email) => String(process.env.ADMIN_EMAILS || '')
+export const isAdmin = (email) => String(
+  process.env.ADMIN_EMAILS
+    || process.env.VITE_ADMIN_EMAILS
+    || process.env.VITE_ADMIN_EMAIL
+    || ''
+)
   .split(',')
   .map((value) => value.trim().toLowerCase())
   .filter(Boolean)
@@ -39,5 +44,6 @@ export const isAdmin = (email) => String(process.env.ADMIN_EMAILS || '')
 
 export const sendError = (res, error) => {
   console.error(error);
-  res.status(error.statusCode || 500).send(error.message || 'Request failed');
+  const clerkMessage = error.errors?.[0]?.longMessage || error.errors?.[0]?.message;
+  res.status(error.statusCode || error.status || 500).send(clerkMessage || error.message || 'Request failed');
 };
