@@ -42,8 +42,7 @@ const normalizeAccessUser = (row) => ({
 
 const fetchUsersFromDb = async () => {
   try {
-    const rows = await sql`SELECT email, role, is_active, team_id FROM app_users ORDER BY email ASC`;
-    return rows.map(normalizeAccessUser);
+    return await apiRequest('/api/users');
   } catch (err) {
     console.warn('Unable to load app_users from Neon:', err);
     return DEFAULT_ADMIN_EMAILS.map((email) => ({ email, role: 'admin', isActive: true }));
