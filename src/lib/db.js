@@ -1,9 +1,51 @@
-import { neon } from '@neondatabase/serverless';
+let getToken = async () => null;
 
-const dbUrl = import.meta.env.VITE_NEON_DATABASE_URL;
+export const configureApiAuth = (tokenGetter) => {
+  getToken = tokenGetter;
+};
 
-if (!dbUrl || dbUrl.includes('INSERISCI_QUI')) {
-  console.warn("Inserisci il tuo URL Neon nel file .env.local");
-}
+const execute = async (query, values) => {
+  const token = await getToken();
+  const response = await fetch('/api/sql', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ query, values }),
+  });
 
-export const sql = neon(dbUrl || '');
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Database request failed (${response.status})`);
+  }
+
+  return response.json();
+};
+
+export const apiRequest = async (path, options = {}) => {
+  const token = await getToken();
+  const response = await fetch(path, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `API request failed (${response.status})`);
+  }
+
+  return response.json();
+};
+
+export const sql = (strings, ...values) => {
+  const query = strings.reduce(
+    (result, string, index) => `${result}${string}${index < values.length ? `$${index + 1}` : ''}`,
+    ''
+  );
+  return execute(query, values);
+};

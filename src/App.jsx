@@ -1,4 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  SignIn,
+  UserButton,
+  useAuth,
+  useUser,
+} from '@clerk/clerk-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { sql } from './lib/db';
 import TeamsGrid from './components/TeamsGrid';
 import TeamDetail from './components/TeamDetail';
@@ -7,6 +14,7 @@ import Settings from './components/Settings';
 import AssignPlayerModal from './components/AssignPlayerModal';
 import TeamModal from './components/TeamModal';
 import DeleteConfirmModal from './components/DeleteConfirmModal';
+import { apiRequest, configureApiAuth } from './lib/db';
 
 const ROLE_LABELS = {
   P: 'Portieri',
@@ -16,7 +24,194 @@ const ROLE_LABELS = {
   ALL: 'Tutti',
 };
 
+const DEFAULT_ADMIN_EMAILS = [
+  import.meta.env.VITE_ADMIN_EMAILS || '',
+  import.meta.env.VITE_ADMIN_EMAIL || '',
+]
+  .flatMap((value) => value.split(','))
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean)
+  .filter((email, index, emails) => emails.indexOf(email) === index);
+
+const normalizeAccessUser = (row) => ({
+  email: String(row.email || '').trim().toLowerCase(),
+  role: row.role === 'admin' ? 'admin' : 'user',
+  isActive: row.is_active !== false && row.is_active !== 0,
+  teamId: row.team_id ?? null,
+});
+
+const fetchUsersFromDb = async () => {
+  try {
+    const rows = await sql`SELECT email, role, is_active, team_id FROM app_users ORDER BY email ASC`;
+    return rows.map(normalizeAccessUser);
+  } catch (err) {
+    console.warn('Unable to load app_users from Neon:', err);
+    return DEFAULT_ADMIN_EMAILS.map((email) => ({ email, role: 'admin', isActive: true }));
+  }
+};
+
 const getListValue = (player) => Number(player?.list_value ?? player?.price_spent ?? 0) || 0;
+
+function UserAccessManager({ teams }) {
+  const { user } = useUser();
+  const currentUserEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase() || '';
+  const [users, setUsers] = useState([]);
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const refreshUsers = async () => {
+    const nextUsers = await fetchUsersFromDb();
+    setUsers(nextUsers);
+  };
+
+  useEffect(() => {
+    refreshUsers();
+  }, []);
+
+  const currentUserEntry = useMemo(
+    () => users.find((entry) => entry.email.toLowerCase() === currentUserEmail),
+    [users, currentUserEmail]
+  );
+
+  const isAdmin = Boolean(
+    currentUserEntry?.role === 'admin' && currentUserEntry?.isActive !== false
+      || (
+        DEFAULT_ADMIN_EMAILS.includes(currentUserEmail)
+      )
+  );
+
+  const addUser = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const email = String(formData.get('email') || '').trim().toLowerCase();
+    const password = String(formData.get('password') || '');
+    const teamId = String(formData.get('team_id') || '');
+    if (!email || !password) return;
+
+    try {
+      setError('');
+      setIsSubmitting(true);
+      await apiRequest('/api/users', {
+        method: 'POST',
+        body: JSON.stringify({ email, password, teamId: teamId ? Number(teamId) : null }),
+      });
+      e.currentTarget.reset();
+      await refreshUsers();
+    } catch (err) {
+      console.error('Failed to add user:', err);
+      setError(err.message || 'Impossibile aggiungere l’utente.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const toggleActive = async (email) => {
+    try {
+      const nextValue = !users.find((entry) => entry.email.toLowerCase() === email.toLowerCase())?.isActive;
+      await sql`
+        UPDATE app_users
+        SET is_active = ${nextValue}
+        WHERE email = ${email.toLowerCase()}
+      `;
+      await refreshUsers();
+    } catch (err) {
+      console.error('Failed to toggle active state:', err);
+    }
+  };
+
+  const toggleAdmin = async (email) => {
+    try {
+      const current = users.find((entry) => entry.email.toLowerCase() === email.toLowerCase());
+      const nextRole = current?.role === 'admin' ? 'user' : 'admin';
+
+      await sql`
+        UPDATE app_users
+        SET role = ${nextRole}
+        WHERE email = ${email.toLowerCase()}
+      `;
+      await refreshUsers();
+    } catch (err) {
+      console.error('Failed to toggle admin role:', err);
+    }
+  };
+
+  if (!user) {
+    return null;
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="panel-card" style={{ marginTop: '20px', padding: '24px' }}>
+        <h2>Accesso non autorizzato</h2>
+        <p>Il tuo account non ha i permessi per gestire gli utenti.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="panel-card" style={{ marginTop: '20px', padding: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+        <div>
+          <div className="eyebrow">Amministrazione</div>
+          <h2 style={{ margin: 0 }}>Utenti e accessi</h2>
+        </div>
+        <UserButton />
+      </div>
+
+      <form onSubmit={addUser} style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
+        <input
+          type="email"
+          name="email"
+          placeholder="nuovo.utente@email.com"
+          style={{ flex: '1', minWidth: '220px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #d1d5db' }}
+        />
+        <input
+          type="password"
+          name="password"
+          placeholder="Password (min. 15 caratteri)"
+          minLength={15}
+          required
+          style={{ flex: '1', minWidth: '220px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #d1d5db' }}
+        />
+        <select name="team_id" defaultValue="" style={{ minWidth: '180px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #d1d5db' }}>
+          <option value="">Nessuna squadra</option>
+          {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
+        </select>
+        <button type="submit" className="primary-button" disabled={isSubmitting}>
+          {isSubmitting ? 'Creazione...' : 'Aggiungi utente'}
+        </button>
+      </form>
+      {error && <p style={{ color: '#b91c1c', marginBottom: '16px' }}>{error}</p>}
+
+      <div style={{ display: 'grid', gap: '12px' }}>
+        {users.length === 0 ? (
+          <p>Nessun utente configurato.</p>
+        ) : (
+          users.map((entry) => (
+            <div key={entry.email} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '12px 14px', border: '1px solid #dfe3ea', borderRadius: '12px', background: '#f8fafc' }}>
+              <div>
+                <div style={{ fontWeight: 700 }}>{entry.email}</div>
+                <div style={{ color: '#64748b', fontSize: '12px' }}>
+                  {entry.role === 'admin' ? 'Admin' : 'Utente'} • {entry.isActive === false ? 'Disabilitato' : 'Abilitato'}
+                  {entry.teamId && ` • ${teams.find((team) => team.id === entry.teamId)?.name || 'Squadra assegnata'}`}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button type="button" className="secondary-button" onClick={() => toggleAdmin(entry.email)}>
+                  {entry.role === 'admin' ? 'Rimuovi admin' : 'Rendi admin'}
+                </button>
+                <button type="button" className="secondary-button" onClick={() => toggleActive(entry.email)}>
+                  {entry.isActive === false ? 'Abilita' : 'Disabilita'}
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const [teams, setTeams] = useState([]);
@@ -26,35 +221,81 @@ export default function App() {
   const [swapMode, setSwapMode] = useState(false);
   const [playerToSwapOut, setPlayerToSwapOut] = useState(null);
 
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [selectedTeamId, setSelectedTeamId] = useState(() => {
-    const match = window.location.pathname.match(/^\/team\/(\d+)$/);
-    return match ? Number(match[1]) : null;
-  });
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [teamToEdit, setTeamToEdit] = useState(null);
   const [teamToDelete, setTeamToDelete] = useState(null);
+  const [accessUsers, setAccessUsers] = useState([]);
+  const { getToken } = useAuth();
+  const { user, isLoaded } = useUser();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const teamMatch = location.pathname.match(/^\/team\/(\d+)$/);
+  const selectedTeamId = teamMatch ? Number(teamMatch[1]) : null;
+  const activeTab = location.pathname === '/settings'
+    ? 'settings'
+    : location.pathname === '/users'
+      ? 'users'
+      : 'dashboard';
+
+  useEffect(() => {
+    configureApiAuth(getToken);
+  }, [getToken]);
+
+  useEffect(() => {
+    if (isLoaded && !user && !location.pathname.startsWith('/login')) {
+      navigate('/login', { replace: true });
+    } else if (isLoaded && user && location.pathname === '/login') {
+      navigate('/', { replace: true });
+    }
+  }, [isLoaded, user, location.pathname, navigate]);
 
   const selectedTeam = teams.find((team) => team.id === selectedTeamId) || null;
   const auctionedPlayers = players.filter((player) => player.assigned_team_id !== null).length;
 
+  const refreshAccessUsers = async () => {
+    const users = await fetchUsersFromDb();
+    setAccessUsers(users);
+  };
+
+  useEffect(() => {
+    if (user) {
+      refreshAccessUsers();
+    }
+  }, [user]);
+
+  const currentUserEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase() || '';
+  const currentAccessEntry = accessUsers.find((entry) => entry.email.toLowerCase() === currentUserEmail);
+  const hasAccess = Boolean(
+    user &&
+    (
+      currentAccessEntry?.isActive !== false
+        || DEFAULT_ADMIN_EMAILS.includes(currentUserEmail)
+    )
+  );
+  const isAdmin = Boolean(
+    user && (
+      currentAccessEntry?.role === 'admin' && currentAccessEntry?.isActive !== false
+        || DEFAULT_ADMIN_EMAILS.includes(currentUserEmail)
+    )
+  );
+
   const updateRoute = (path) => {
     const nextPath = path || '/';
     if (window.location.pathname !== nextPath) {
-      window.history.pushState({}, '', nextPath);
+      navigate(nextPath);
     }
   };
 
   const goToDashboard = () => {
-    setSelectedTeamId(null);
-    setActiveTab('dashboard');
     updateRoute('/');
   };
 
   const goToSettings = () => {
-    setSelectedTeamId(null);
-    setActiveTab('settings');
     updateRoute('/settings');
+  };
+
+  const goToUsers = () => {
+    updateRoute('/users');
   };
 
   const openTeam = (team) => {
@@ -63,32 +304,28 @@ export default function App() {
       return;
     }
 
-    setSelectedTeamId(team.id);
-    setActiveTab('dashboard');
     updateRoute(`/team/${team.id}`);
   };
 
   const closeTeamDetail = () => {
-    setSelectedTeamId(null);
-    setActiveTab('dashboard');
     updateRoute('/');
   };
 
   const fetchData = async () => {
     try {
       const teamsRes = await sql`SELECT * FROM teams ORDER BY id ASC`;
+      setTeams(teamsRes);
+
       const playersRes = await sql`SELECT * FROM players ORDER BY name ASC`;
       const normalizedPlayers = playersRes.map((player) => ({
         ...player,
         list_value: player.list_value ?? player.price_spent ?? 0,
       }));
 
-      setTeams(teamsRes);
       setPlayers(normalizedPlayers);
 
       if (selectedTeamId && !teamsRes.some((team) => team.id === selectedTeamId)) {
-        setSelectedTeamId(null);
-        if (window.location.pathname.startsWith('/team/')) {
+        if (location.pathname.startsWith('/team/')) {
           updateRoute('/');
         }
       }
@@ -98,24 +335,13 @@ export default function App() {
   };
 
   useEffect(() => {
-    const syncFromUrl = () => {
-      const match = window.location.pathname.match(/^\/team\/(\d+)$/);
-      const nextId = match ? Number(match[1]) : null;
-      setSelectedTeamId(nextId);
-      setActiveTab(nextId ? 'dashboard' : (window.location.pathname === '/settings' ? 'settings' : 'dashboard'));
-    };
-
-    syncFromUrl();
-    window.addEventListener('popstate', syncFromUrl);
-
     fetchData();
     const interval = setInterval(fetchData, 2500);
 
     return () => {
-      window.removeEventListener('popstate', syncFromUrl);
       clearInterval(interval);
     };
-  }, []);
+  }, [location.pathname]);
 
   const confirmDeleteTeam = async () => {
     if (!teamToDelete) return;
@@ -160,6 +386,49 @@ export default function App() {
       };
     });
 
+  if (!isLoaded) {
+    return <div className="app-shell" style={{ padding: '40px' }}>Caricamento...</div>;
+  }
+
+  if (!user) {
+    if (!location.pathname.startsWith('/login')) {
+      return <div className="app-shell" style={{ padding: '40px' }}>Caricamento...</div>;
+    }
+
+    return (
+      <div className="app-shell" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#f4f7fb' }}>
+        <div style={{ maxWidth: '420px', width: '100%' }}>
+          <SignIn
+            path="/login"
+            routing="path"
+            signUpUrl={undefined}
+            afterSignInUrl="/"
+            appearance={{
+              elements: {
+                rootBox: { width: '100%' },
+                card: { width: '100%' },
+              },
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <div className="app-shell" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#f4f7fb' }}>
+        <div className="panel-card" style={{ maxWidth: '420px', padding: '32px', textAlign: 'center' }}>
+          <h2>Accesso negato</h2>
+          <p style={{ color: '#475569' }}>
+            Il tuo account non è stato abilitato. Contatta l’amministratore.
+          </p>
+          <UserButton />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -188,10 +457,22 @@ export default function App() {
           >
             Impostazioni
           </button>
+          {isAdmin && (
+            <button
+              type="button"
+              className={`nav-button ${activeTab === 'users' && !selectedTeam ? 'nav-button--active' : ''}`}
+              onClick={goToUsers}
+            >
+              Utenti
+            </button>
+          )}
+          <UserButton />
         </div>
       </header>
 
-      {selectedTeam ? (
+      {activeTab === 'users' ? (
+        <UserAccessManager teams={teams} />
+      ) : selectedTeam ? (
         <div className="workspace-grid workspace-grid--single" style={{ marginTop: '18px' }}>
           <div className="panel-card main-column">
             <TeamDetail
