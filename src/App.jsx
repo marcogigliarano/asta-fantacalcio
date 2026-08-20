@@ -468,7 +468,6 @@ export default function App() {
   const liveActivity = [...players]
     .filter((player) => player.assigned_team_id !== null && Number(player.price_spent) > 0)
     .sort((a, b) => Number(b.price_spent) - Number(a.price_spent))
-    .slice(0, 5)
     .map((player) => {
       const team = teams.find((item) => item.id === player.assigned_team_id);
       return {
