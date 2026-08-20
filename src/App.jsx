@@ -24,6 +24,8 @@ const ROLE_LABELS = {
   ALL: 'Tutti',
 };
 
+const TOTAL_PLAYERS_PER_TEAM = 3 + 8 + 8 + 6;
+
 const DEFAULT_ADMIN_EMAILS = [
   import.meta.env.VITE_ADMIN_EMAILS || '',
   import.meta.env.VITE_ADMIN_EMAIL || '',
@@ -341,6 +343,7 @@ export default function App() {
 
   const selectedTeam = teams.find((team) => team.id === selectedTeamId) || null;
   const auctionedPlayers = players.filter((player) => player.assigned_team_id !== null).length;
+  const totalPlayerSlots = teams.length * TOTAL_PLAYERS_PER_TEAM;
 
   const refreshAccessUsers = async () => {
     const users = await fetchUsersFromDb();
@@ -530,7 +533,7 @@ export default function App() {
         <div className="topbar-actions">
           <div className="stat-chip">
             <span className="stat-chip__label">Giocatori acquistati</span>
-            <span className="stat-chip__value">{auctionedPlayers}</span>
+            <span className="stat-chip__value">{auctionedPlayers} / {totalPlayerSlots}</span>
           </div>
 
           <button
