@@ -220,7 +220,7 @@ function UserAccessManager({ teams }) {
         <AccountControl />
       </div>
 
-      <form onSubmit={addUser} style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
+      <form className="user-create-form" onSubmit={addUser} style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
         <input
           type="email"
           name="email"
@@ -250,7 +250,7 @@ function UserAccessManager({ teams }) {
           <p>Nessun utente configurato.</p>
         ) : (
           users.map((entry) => (
-            <div key={entry.email} style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '12px 14px', border: '1px solid #dfe3ea', borderRadius: '12px', background: '#f8fafc' }}>
+            <div className="user-access-row" key={entry.email} style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '12px 14px', border: '1px solid #dfe3ea', borderRadius: '12px', background: '#f8fafc' }}>
               <div>
                 <div style={{ fontWeight: 700 }}>{entry.email}</div>
                 <div style={{ color: '#64748b', fontSize: '12px' }}>
@@ -278,7 +278,7 @@ function UserAccessManager({ teams }) {
                 )}
               </div>
               {editingEmail === entry.email && (
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', width: '100%', marginTop: '10px' }}>
+                <div className="user-edit-form" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', width: '100%', marginTop: '10px' }}>
                   <input
                     type="password"
                     value={editPassword}

@@ -279,6 +279,7 @@ p {
   scroll-snap-align: start;
   width: 240px;
   min-width: 240px;
+  flex: 0 0 240px;
   background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(249,250,251,0.98) 100%);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-card);
@@ -1175,6 +1176,56 @@ p {
     flex-wrap: wrap;
   }
 
+  .topbar-actions .nav-button,
+  .topbar-actions .secondary-button {
+    flex: 1 1 auto;
+  }
+
+  .teams-strip__header,
+  .section-actions {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .section-actions {
+    width: 100%;
+  }
+
+  .section-actions > *,
+  .search-toolbar > button {
+    flex: 1 1 auto;
+  }
+
+  .workspace-grid,
+  .workspace-grid--single {
+    gap: 14px;
+    margin-top: 14px;
+  }
+
+  .main-column,
+  .sidebar-column {
+    padding: 14px;
+  }
+
+  .user-create-form > *,
+  .user-edit-form > * {
+    flex: 1 1 100% !important;
+    min-width: 0 !important;
+  }
+
+  .user-create-form button,
+  .user-edit-form button {
+    width: 100%;
+  }
+
+  .user-access-row > div:last-child {
+    width: 100%;
+  }
+
+  .user-access-row > div:last-child button {
+    flex: 1 1 140px;
+  }
+
   .stat-chip {
     min-width: 0;
     flex: 1;
@@ -1192,6 +1243,136 @@ p {
 }
 
 @media (max-width: 520px) {
+  .app-shell {
+    padding: 12px 10px 24px;
+  }
+
+  .topbar {
+    gap: 12px;
+    padding: 10px;
+    border-radius: 12px;
+  }
+
+  .brand {
+    font-size: 0.95rem;
+  }
+
+  .topbar-actions {
+    gap: 8px;
+  }
+
+  .topbar-actions .stat-chip {
+    flex-basis: 100%;
+  }
+
+  .topbar-actions .nav-button,
+  .topbar-actions .secondary-button {
+    flex-basis: calc(50% - 4px);
+    padding: 8px 10px;
+  }
+
+  .teams-panel {
+    margin-top: 12px;
+  }
+
+  .teams-strip:not(.teams-strip--grid) .team-card {
+    width: min(82vw, 290px);
+    min-width: min(82vw, 290px);
+    flex-basis: min(82vw, 290px);
+  }
+
+  .team-detail__header {
+    padding: 14px;
+  }
+
+  .team-detail__stats {
+    display: grid;
+    gap: 6px;
+    font-size: 0.88rem;
+  }
+
+  .team-detail__grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .role-panel {
+    min-width: 0;
+    padding: 12px;
+    border-radius: 12px;
+  }
+
+  .role-panel__header {
+    align-items: flex-start;
+  }
+
+  .role-panel__title {
+    min-width: 0;
+    font-size: 0.98rem;
+  }
+
+  .role-panel__total {
+    flex-shrink: 0;
+    min-width: 62px;
+    padding: 4px 7px;
+    font-size: 0.82rem;
+  }
+
+  .role-list__item {
+    align-items: flex-start;
+  }
+
+  .role-list__info {
+    min-width: 0;
+  }
+
+  .role-list__name {
+    overflow-wrap: anywhere;
+  }
+
+  .player-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .player-row > div:first-child {
+    width: 100%;
+  }
+
+  .player-meta__name {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .player-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .player-actions button {
+    flex: 1 1 auto;
+  }
+
+  .search-shell {
+    gap: 8px;
+  }
+
+  .search-count {
+    min-width: 34px;
+    padding: 0 8px;
+  }
+
+  .modal-backdrop {
+    padding: 10px;
+  }
+
+  .modal-panel {
+    padding: 16px;
+    border-radius: 12px;
+  }
+
   .teams-strip--grid {
     grid-template-columns: 1fr;
   }
